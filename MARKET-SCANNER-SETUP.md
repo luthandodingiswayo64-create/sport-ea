@@ -1,29 +1,27 @@
 # SPORT EA live H1 market scanner
 
-The existing photo-chart app at `index.html` is preserved. The market scanner is added at `/market-scanner.html` and the Netlify function lives at `/.netlify/functions/market-scan`.
+The existing photo-chart app at `index.html` is preserved. The market scanner is at `/market-scanner.html`; the Netlify function is `/.netlify/functions/market-scan`.
 
-## Live data setup
+## Live data setup and deployment
 
-1. Deploy this repository as a Netlify site (or connect the existing Netlify site to the `feature/live-market-scanner` branch). `netlify.toml` publishes the repository root and configures `netlify/functions`.
-2. Create a Twelve Data API key at [twelvedata.com](https://twelvedata.com/). Confirm that your plan permits hourly time-series requests for forex, XAU/USD and BTC/USD. Provider quotas/pricing can change; check your account plan.
-3. In Netlify, open **Site configuration → Environment variables** and add `TWELVE_DATA_API_KEY` with the API key. Do not put the key in browser code or commit it to Git.
-4. Redeploy after setting the variable. Open `https://<your-site>/market-scanner.html` and press **Refresh scan**. The header should say **LIVE DATA** and the timestamp/prices should populate only if all four provider requests succeed.
-5. For local development, install the Netlify CLI and run `netlify dev` from the repository root after setting `TWELVE_DATA_API_KEY` in your local shell. Do not commit `.env` files.
+1. Connect the repository to a Netlify site and select the `feature/live-market-scanner` branch for deployment.
+2. Create a Twelve Data API key and verify the account supports hourly EUR/USD, GBP/USD, XAU/USD and BTC/USD calls.
+3. Set secret site environment variable `TWELVE_DATA_API_KEY` in Netlify.
+4. Redeploy and review deploy/function logs.
+5. Open `/market-scanner.html` on HTTPS and press **Refresh scan**. It is live only if all four markets return valid candles.
 
-If the key is missing, a symbol is unavailable on your provider plan, the API quota is exceeded, or Netlify cannot reach the provider, the page displays **LIVE UNAVAILABLE** and no sample prices. Inspect Netlify function logs and Twelve Data's response/usage. The endpoint intentionally reports a failure rather than mixing live and placeholder data.
+`netlify.toml` publishes the repository root and configures `netlify/functions`. Local development requires Node.js 18+, Netlify CLI and `TWELVE_DATA_API_KEY`; run `netlify dev`. Never commit the key.
 
 ## Strategy and behavior
 
-The function requests 100 hourly candles for EUR/USD, GBP/USD, XAU/USD and BTC/USD. It computes 20/50-hour simple moving averages, Wilder RSI(14), recent 24-hour price change, and support/resistance from the preceding 24 candles. A BUY/SELL requires aligned average trend, a recent test of the fast average, a confirming candle, and RSI in the configured range; otherwise it returns WAIT. This is a transparent educational heuristic, not a backtest or trading recommendation. Check symbol availability and candle conventions against your provider/account before relying on its output.
+The function requests 100 hourly candles, computes 20/50-hour SMA, Wilder RSI(14), 24-hour change and 24-candle support/resistance. BUY/SELL requires aligned trend, pullback test and RSI bounds; otherwise WAIT. It is educational, not financial advice.
 
-Signal changes and previous signal values are stored in the user's browser localStorage. Browser notifications require HTTPS, explicit permission, and the page to remain open; this implementation is not push messaging and cannot alert when the page/browser is closed. Notifications also vary by mobile browser.
+Signal changes use browser localStorage. Notifications require HTTPS and permission and work only while the page is open.
 
 ## Tests
 
-Run the pure strategy tests with Node.js 18 or newer:
-
 ```sh
-node --test test/market-scan-core.test.mjs
+npm test
 ```
 
-This validates calculations and signal behavior without an API key. To test the actual provider connection, deploy with your own API key and call the deployed endpoint; automated tests do not claim provider credentials, quota, symbols, or network access have been verified.
+Tests cover calculations, invalid inputs, missing credentials, successful mocked provider responses for all four markets, and fail-closed behavior. They do not verify real credentials, quotas, live symbols or a deployed Netlify site.
